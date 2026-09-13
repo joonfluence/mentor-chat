@@ -41,6 +41,13 @@ LangGraph로 판단 노드를 추가: "이 질문이 답만 원하는 건가, �
 - **범위 확정(0914 명시)**: "맥락 부족 시 되묻기" 3번째 갈래는 지금 범위에서 제외 — 상태관리가 복잡해지므로 필요해지면 Phase 3.5로 별도 진행.
 - `chat.py`(단선 파이프라인, CLI 디버그용)는 그대로 남겨둠 — graph.py가 내부적으로 재사용.
 
+### Phase 4 — 확장 (진행 중, `prompt.txt` 기반)
+Phase 1~3 완료 후 사용자가 `prompt.txt`에 남긴 확장 요청 3가지. 적힌 순서대로 진행.
+
+1. **LLM provider 교체 가능하게 (완료, 2026-09-14)** — `chat.py`의 `build_llm()`이 `LLM_PROVIDER` 환경변수로 Claude/opencode를 선택. **주의**: 원래 목표는 "무료 모델"이었지만 조사 결과 opencode Zen의 진짜 무료 모델("-free" 접미사)은 API로 직접 호출이 막혀있음(`"OpenCode's free tier can only be used in OpenCode"` 에러, 직접 curl로 확인) — opencode CLI/TUI 세션 안에서만 동작. 대신 같은 게이트웨이의 저가 모델(`deepseek-v4-flash`, 1M 토큰당 입력 $0.14/출력 $0.28)을 표준 OpenAI 호환 엔드포인트(`https://opencode.ai/zen/v1/chat/completions`, `langchain_openai.ChatOpenAI`)로 연결 — 실제 호출당 $0.00003 수준이라 사실상 무료에 가까움. `.env`의 `LLM_PROVIDER=opencode` + `OPENCODE_API_KEY`(opencode CLI 로그인 시 발급된 키 재사용)로 전환, 기본값은 `anthropic`이라 기존 동작 불변.
+2. **웹 검색 추가 (다음)** — Tavily API로 vault 근거 외 실시간 웹 검색 결과도 함께 쓸 수 있게. graph.py에 검색 노드 추가 예정.
+3. **DB 저장 + 아젠다 기반 온디맨드 상담 (다음)** — `logs/conversations.jsonl` 대신 DB(SQLite 예정, 로컬 실행 원칙 유지)에 상담 내역 저장. 사용자가 아젠다(주제·목표)를 명시적으로 입력하면 근거+기억을 총동원해 깊은 피드백을 주는 온디맨드 상담 모드 추가 — 자동/주기적 트리거는 범위 밖(0914 명시, 필요해지면 별도 진행).
+
 ## 기술 스택 (결정 사항)
 | 구성 요소 | 선택 | 이유 |
 |---|---|---|

@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 
 from memory_store import load_memory
 
@@ -16,10 +17,28 @@ load_dotenv()
 PERSIST_DIR = os.path.join(os.path.dirname(__file__), "chroma_db")
 COLLECTION_NAME = "mentor_wiki"
 
+# LLM_PROVIDER=opencode로 바꾸면 Claude 대신 opencode Zen 게이트웨이의 모델을 쓴다.
+# opencode의 진짜 무료 모델("-free")은 opencode CLI 안에서만 호출 가능해서 막혀 있고(API로 부르면
+# "OpenCode's free tier can only be used in OpenCode" 에러), 대신 같은 게이트웨이의 저가 모델
+# (기본값 deepseek-v4-flash, 1M 토큰당 $0.14/$0.28 수준)을 표준 OpenAI 호환 API로 쓴다.
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic")
+OPENCODE_MODEL = os.environ.get("OPENCODE_MODEL", "deepseek-v4-flash")
+OPENCODE_BASE_URL = "https://opencode.ai/zen/v1"
+
 SYSTEM_PROMPT = """너는 사용자의 개인 세컨드 브레인(Obsidian 위키 노트)을 근거로 답하는 상담 도우미다.
 아래 [근거 문서]에 있는 내용만 근거로 답하고, 근거에 없는 내용은 추측하지 말고 "이 vault에서는 근거를 못 찾았다"고 솔직히 말해라.
 [이전 기억]은 과거 상담에서 이미 확인된 사용자의 결정·선호·반복되는 고민이다 — 답변 맥락을 이어가는 데 참고하되, vault 근거인 것처럼 인용하지는 마라.
 답변 끝에 어떤 노트(제목)를 근거로 썼는지 출처를 밝혀라."""
+
+
+def build_llm():
+    if LLM_PROVIDER == "opencode":
+        return ChatOpenAI(
+            model=OPENCODE_MODEL,
+            api_key=os.environ["OPENCODE_API_KEY"],
+            base_url=OPENCODE_BASE_URL,
+        )
+    return ChatAnthropic(model="claude-sonnet-5")
 
 
 def get_chain():
@@ -30,7 +49,7 @@ def get_chain():
         persist_directory=PERSIST_DIR,
     )
     retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-    llm = ChatAnthropic(model="claude-sonnet-5")
+    llm = build_llm()
     return retriever, llm
 
 

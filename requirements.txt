@@ -1,5 +1,6 @@
 langchain
 langchain-anthropic
+langchain-openai
 langchain-community
 langchain-chroma
 langgraph
