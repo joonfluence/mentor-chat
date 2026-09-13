@@ -47,24 +47,31 @@ def _extract_text(content) -> str:
     return "\n".join(parts)
 
 
-def ask(question: str, retriever, llm) -> dict:
+def retrieve_context(question: str, retriever) -> tuple[str, list[str]]:
     docs = retriever.invoke(question)
     context = "\n\n---\n\n".join(
         f"[{d.metadata.get('title')}]\n{d.page_content}" for d in docs
     )
     sources = sorted({d.metadata.get("title") for d in docs})
+    return context, sources
 
+
+def memory_text() -> str:
     memory_items = load_memory()
-    memory_text = (
+    return (
         "\n".join(f"- ({m['type']}) {m['content']}" for m in memory_items)
         or "(아직 없음)"
     )
+
+
+def ask(question: str, retriever, llm) -> dict:
+    context, sources = retrieve_context(question, retriever)
 
     messages = [
         ("system", SYSTEM_PROMPT),
         (
             "human",
-            f"[이전 기억]\n{memory_text}\n\n[근거 문서]\n{context}\n\n[질문]\n{question}",
+            f"[이전 기억]\n{memory_text()}\n\n[근거 문서]\n{context}\n\n[질문]\n{question}",
         ),
     ]
     response = llm.invoke(messages)
