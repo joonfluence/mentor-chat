@@ -21,8 +21,13 @@
 
 **완료 기준**: 실제 vault 내용에 대해 질문했을 때, 근거 노트를 인용하며 정확히 답하는 게 눈으로 확인되면 Phase 1 끝.
 
-### Phase 2 — 메모리 저장 (다음)
+### Phase 2 — 메모리 저장 (완료, 2026-09-14)
 Phase 1의 상담 로그에서 "기억할 만한 것"(반복되는 고민, 이미 내린 결정, 선호)을 LLM으로 추출해 별도 메모리 파일(JSON)에 구조화 저장. 다음 대화부터는 검색 결과 + 이 메모리를 같이 프롬프트에 넣는다 — 지금 이 Claude 세션의 `memory/` 시스템과 개념적으로 동일한 것을 직접 만들어보는 것.
+
+- `memory_store.py` — `memory.json` 읽기/쓰기 공용 모듈
+- `extract_memory.py` — `logs/conversations.jsonl` 전체를 LLM으로 훑어 `{content, type: decision|preference|recurring_concern, source_question, created_at}` 형태로 추출, 기존 memory.json과 content 기준 중복 제거 후 병합. **ingest.py와 같은 수동 배치 스크립트** — 대화 후 필요할 때 `python extract_memory.py`로 직접 실행(자동 트리거 아님, 비용·지연 통제 목적으로 의도적 선택).
+- `chat.py`의 `ask()`가 매 질문마다 `memory.json`을 읽어 프롬프트의 [이전 기억] 섹션에 포함 — vault 근거와는 구분해서 참고만 하도록 시스템 프롬프트에 명시.
+- `memory.json`은 개인 데이터라 `logs/`와 마찬가지로 git-ignore.
 
 ### Phase 3 — 방향 제안 (다음)
 LangGraph로 판단 노드를 추가: "이 질문이 답만 원하는 건가, 방향 조언이 필요한 맥락인가"를 분기해서, 후자면 검색 결과+메모리를 종합해 먼저 다음 행동을 제안하는 노드로 보낸다. 어제 영상(양실장 8강)의 "노드/엣지로 루프·분기" 개념이 실제로 쓰이는 지점.
