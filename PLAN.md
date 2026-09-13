@@ -29,8 +29,17 @@ Phase 1의 상담 로그에서 "기억할 만한 것"(반복되는 고민, 이�
 - `chat.py`의 `ask()`가 매 질문마다 `memory.json`을 읽어 프롬프트의 [이전 기억] 섹션에 포함 — vault 근거와는 구분해서 참고만 하도록 시스템 프롬프트에 명시.
 - `memory.json`은 개인 데이터라 `logs/`와 마찬가지로 git-ignore.
 
-### Phase 3 — 방향 제안 (다음)
-LangGraph로 판단 노드를 추가: "이 질문이 답만 원하는 건가, 방향 조언이 필요한 맥락인가"를 분기해서, 후자면 검색 결과+메모리를 종합해 먼저 다음 행동을 제안하는 노드로 보낸다. 어제 영상(양실장 8강)의 "노드/엣지로 루프·분기" 개념이 실제로 쓰이는 지점.
+### Phase 3 — 방향 제안 (완료, 2026-09-14)
+LangGraph로 판단 노드를 추가: "이 질문이 답만 원하는 건가, 방향 조언이 필요한 맥락인가"를 분기해서, 후자면 검색 결과+메모리를 종합해 먼저 다음 행동을 제안하는 노드로 보낸다. 양실장 8강의 "노드/엣지로 루프·분기" 개념이 실제로 쓰이는 지점.
+
+- `graph.py` — `StateGraph`로 `retrieve → classify → (조건부 엣지) → answer_info | answer_direction → END` 구성.
+  - `classify` 노드: LLM에게 질문을 `info`/`direction` 중 하나로만 분류시킴.
+  - `answer_info`: Phase 1과 동일한 스타일(근거로만 답).
+  - `answer_direction`: 근거 + `memory.json`을 종합해 (1) 짧은 답 (2) 구체적 다음 행동 제안, 두 부분으로 답변.
+  - 두 답변 노드 모두 `chat.py`의 `retrieve_context()`/`memory_text()`/`SYSTEM_PROMPT`/`_extract_text()`를 재사용 — 검색·기억 로직 중복 없음.
+- `app.py`가 `chat.ask()` 대신 `graph.ask()`를 호출하도록 전환. 어느 갈래로 답했는지(`정보 답변`/`방향 제안`) UI 캡션과 `logs/conversations.jsonl`의 `route` 필드에 남김.
+- **범위 확정(0914 명시)**: "맥락 부족 시 되묻기" 3번째 갈래는 지금 범위에서 제외 — 상태관리가 복잡해지므로 필요해지면 Phase 3.5로 별도 진행.
+- `chat.py`(단선 파이프라인, CLI 디버그용)는 그대로 남겨둠 — graph.py가 내부적으로 재사용.
 
 ## 기술 스택 (결정 사항)
 | 구성 요소 | 선택 | 이유 |
