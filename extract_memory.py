@@ -1,19 +1,17 @@
-"""Phase 2: 상담 로그(logs/conversations.jsonl)에서 기억할 만한 것을 추출해 memory.json에 저장한다.
-매번 로그 전체를 다시 훑어 LLM으로 추출하고, 기존 memory.json과 content 기준으로 중복 없이 병합한다.
+"""Phase 2: 상담 내역(Phase 4-3부터는 DB)에서 기억할 만한 것을 추출해 memory.json에 저장한다.
+매번 전체 상담 내역을 다시 훑어 LLM으로 추출하고, 기존 memory.json과 content 기준으로 중복 없이 병합한다.
 """
 
 import json
-import os
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
-from langchain_anthropic import ChatAnthropic
 
+from chat import _extract_text, build_llm
+from db import list_conversations
 from memory_store import MEMORY_PATH, load_memory, save_memory
 
 load_dotenv()
-
-LOG_PATH = os.path.join(os.path.dirname(__file__), "logs", "conversations.jsonl")
 
 EXTRACT_PROMPT = """아래는 사용자와 '멘토와의 대화' 챗봇 사이의 상담 기록이다.
 이 대화들에서 앞으로 다른 대화에서도 참고할 가치가 있는 것만 뽑아라:
@@ -35,10 +33,7 @@ EXTRACT_PROMPT = """아래는 사용자와 '멘토와의 대화' 챗봇 사이�
 
 
 def load_conversations() -> list[dict]:
-    if not os.path.exists(LOG_PATH):
-        return []
-    with open(LOG_PATH, "r", encoding="utf-8") as f:
-        return [json.loads(line) for line in f if line.strip()]
+    return list_conversations()
 
 
 def extract(conversations: list[dict], llm) -> list[dict]:
@@ -48,7 +43,7 @@ def extract(conversations: list[dict], llm) -> list[dict]:
         f"Q: {c['question']}\nA: {c['answer']}" for c in conversations
     )
     response = llm.invoke(EXTRACT_PROMPT.format(conversations=formatted))
-    text = response.content.strip()
+    text = _extract_text(response.content).strip()
     if text.startswith("```"):
         text = text.strip("`")
         text = text[text.find("[") :]
@@ -84,7 +79,7 @@ def main():
     conversations = load_conversations()
     print(f"상담 기록 {len(conversations)}건 로드")
 
-    llm = ChatAnthropic(model="claude-sonnet-5")
+    llm = build_llm()
     new_items = extract(conversations, llm)
     print(f"추출된 항목 {len(new_items)}개")
 

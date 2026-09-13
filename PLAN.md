@@ -46,7 +46,13 @@ Phase 1~3 완료 후 사용자가 `prompt.txt`에 남긴 확장 요청 3가지. 
 
 1. **LLM provider 교체 가능하게 (완료, 2026-09-14)** — `chat.py`의 `build_llm()`이 `LLM_PROVIDER` 환경변수로 Claude/opencode를 선택. **주의**: 원래 목표는 "무료 모델"이었지만 조사 결과 opencode Zen의 진짜 무료 모델("-free" 접미사)은 API로 직접 호출이 막혀있음(`"OpenCode's free tier can only be used in OpenCode"` 에러, 직접 curl로 확인) — opencode CLI/TUI 세션 안에서만 동작. 대신 같은 게이트웨이의 저가 모델(`deepseek-v4-flash`, 1M 토큰당 입력 $0.14/출력 $0.28)을 표준 OpenAI 호환 엔드포인트(`https://opencode.ai/zen/v1/chat/completions`, `langchain_openai.ChatOpenAI`)로 연결 — 실제 호출당 $0.00003 수준이라 사실상 무료에 가까움. `.env`의 `LLM_PROVIDER=opencode` + `OPENCODE_API_KEY`(opencode CLI 로그인 시 발급된 키 재사용)로 전환, 기본값은 `anthropic`이라 기존 동작 불변.
 2. **웹 검색 추가 (코드 완료, 키 대기 중, 2026-09-14)** — `graph.py`에 `web_search` 노드 추가: `retrieve → web_search → classify → answer_*` 순서로 실행, Tavily로 질문당 top-3 웹 결과를 가져와 `[웹 검색 결과]`로 프롬프트에 별도 표기(vault 근거와 구분). `TAVILY_API_KEY` 없으면 자동으로 웹 검색 스킵하고 vault-only로 동작(검증 완료) — 사용자가 tavily.com에서 키 발급하면 `.env`에 채워 넣기만 하면 바로 동작.
-3. **DB 저장 + 아젠다 기반 온디맨드 상담 (다음)** — `logs/conversations.jsonl` 대신 DB(SQLite 예정, 로컬 실행 원칙 유지)에 상담 내역 저장. 사용자가 아젠다(주제·목표)를 명시적으로 입력하면 근거+기억을 총동원해 깊은 피드백을 주는 온디맨드 상담 모드 추가 — 자동/주기적 트리거는 범위 밖(0914 명시, 필요해지면 별도 진행).
+3. **DB 저장 + 아젠다 기반 온디맨드 상담 (완료, 2026-09-14)**
+   - `db.py` — SQLite(`mentor_chat.db`, 로컬 파일, 서버 불필요)에 `agendas`(아젠다: 제목·설명)와 `conversations`(질문·답변·출처·아젠다 연결) 저장. `logs/conversations.jsonl`을 대체.
+   - `migrate_logs_to_db.py` — 기존 JSONL 7건을 DB로 1회 이관(타임스탬프 보존) 완료.
+   - `extract_memory.py`가 이제 DB(`list_conversations()`)에서 상담 내역을 읽음 — Phase 2 로직은 그대로, 데이터 소스만 교체.
+   - `graph.py`에 `agenda_context` 노드 추가: 아젠다가 지정되면 `classify`를 건너뛰고 항상 방향제안(direction) 스타일로 가되, 그 아젠다의 최근 상담 이력(최대 5건)을 `[상담 아젠다]` 섹션으로 프롬프트에 포함 — "지난 상담과 비교해 진행상황이 어떤지" 피드백을 강제하는 시스템 프롬프트로 연속성 있는 코칭 구현. 실제 2턴 연속 테스트로 "지난 상담 때는 X였는데 오늘은 Y" 식 피드백이 나오는 것 확인.
+   - `app.py` 사이드바에 아젠다 선택/생성 UI 추가. 아젠다 선택 시 그 맥락으로 상담, 미선택 시 기존 Phase 3 분기(info/direction) 그대로 동작.
+   - **범위 확정(0914 명시)**: 자동/주기적 체크인은 범위 밖 — 사용자가 명시적으로 아젠다를 골라야만 동작하는 온디맨드 방식.
 
 ## 기술 스택 (결정 사항)
 | 구성 요소 | 선택 | 이유 |
