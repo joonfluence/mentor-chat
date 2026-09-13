@@ -1,6 +1,7 @@
 langchain
 langchain-anthropic
 langchain-openai
+tavily-python
 langchain-community
 langchain-chroma
 langgraph
